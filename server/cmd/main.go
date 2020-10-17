@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"io/ioutil"
 	"log"
 	"net"
 	"strings"
@@ -63,6 +65,12 @@ func main() {
 }
 
 func httpHandler(conn net.Conn){
+	data,err := ioutil.ReadAll(conn)
+	if err != nil{
+		log.Println(err)
+		return
+	}
+	log.Println(string(data))
 	vhostConn, err := vhost.HTTP(conn)
 	if err != nil {
 		log.Println("Failed to read valid:", err)
@@ -75,15 +83,37 @@ func httpHandler(conn net.Conn){
 
 func tcpHandler(conn net.Conn) {
 	//conn.SetReadDeadline(time.Now().Add(connReadTimeout))
-	buffer, err := readMsgShared(conn)
+	//buffer, err := readMsgShared(conn)
+	//if err != nil {
+	//	log.Println("Failed to read message:", err)
+	//	conn.Close()
+	//	return
+	//}
+	////conn.SetReadDeadline(time.Time{})
+	//
+	//log.Println(string(buffer))
+
+	dconn,err := net.Dial("tcp","192.168.1.220:3389")
 	if err != nil {
-		log.Println("Failed to read message:", err)
-		conn.Close()
+		log.Println("连接失败")
 		return
 	}
-	//conn.SetReadDeadline(time.Time{})
-
-	log.Println(string(buffer))
+	//exitChan := make(chan bool,1)
+	//发送数据
+	go func() {
+		_,err = io.Copy(dconn,conn)
+		if err != nil{
+			log.Println("send",err)
+			return
+		}
+	}()
+	//读取数据
+	_,err = io.Copy(conn,dconn)
+	if err != nil{
+		log.Println("read",err)
+		return
+	}
+	dconn.Close()
 }
 
 func readMsgShared(c net.Conn) (buffer []byte, err error) {
